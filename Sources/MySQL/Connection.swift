@@ -32,7 +32,7 @@ public protocol ConnectionOption {
     var timeZone: TimeZone { get }
     var encoding: Connection.Encoding { get }
     var timeout: Int { get }
-    var ssl: Int { get }
+    var sslMode: Int { get }
     var reconnect: Bool { get }
     var ssl: Bool { get }
     var omitDetailsOnError: Bool { get }
@@ -52,7 +52,7 @@ public extension ConnectionOption {
         return 10
     }
 
-    var ssl: Int {
+    var sslMode: Int {
         return 0
     }
 
@@ -123,10 +123,10 @@ public final class Connection {
         }
 
         do {
-            let sslPtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
-            sslPtr.pointee = option.ssl
-            mysql_options(mysql, MYSQL_OPT_SSL_MODE, sslPtr)
-            sslPtr.deallocate()
+            let sslModePtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
+            sslModePtr.pointee = option.sslMode
+            mysql_options(mysql, MYSQL_OPT_SSL_MODE, sslModePtr)
+            sslModePtr.deallocate()
         }
 
         Connection.setReconnect(option.reconnect, mysql: mysql)
