@@ -55,7 +55,7 @@ public extension ConnectionOption {
     }
 
     var ssl: Int {
-        return 0
+        return 1
     }
     var reconnect: Bool {
         return false
