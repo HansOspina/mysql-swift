@@ -114,7 +114,7 @@ public final class Connection {
 
         do {
           let sslPtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
-          sslPtr.pointee = option.ssl
+          sslPtr.pointee = options.ssl
           mysql_options(mysql, MYSQL_OPT_SSL_MODE, sslPtr)
           sslPtr.deallocate()
        }
