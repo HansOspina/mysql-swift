@@ -32,7 +32,9 @@ public protocol ConnectionOption {
     var timeZone: TimeZone { get }
     var encoding: Connection.Encoding { get }
     var timeout: Int { get }
+    var ssl: Int { get }
     var reconnect: Bool { get }
+    var ssl: Bool { get }
     var omitDetailsOnError: Bool { get }
 }
 
@@ -49,6 +51,11 @@ public extension ConnectionOption {
     var timeout: Int {
         return 10
     }
+
+    var ssl: Int {
+        return 0
+    }
+
     var reconnect: Bool {
         return true
     }
@@ -62,7 +69,7 @@ extension Connection {
         case UTF8 = "utf8"
         case UTF8MB4 = "utf8mb4"
     }
-    
+
 }
 
 public enum ConnectionError: Error {
@@ -71,52 +78,59 @@ public enum ConnectionError: Error {
 }
 
 public final class Connection {
-    
+
     internal var isInUse: Bool = false
     private var mysql_: UnsafeMutablePointer<MYSQL>?
-    
+
     internal let pool: ConnectionPool
     public let option: ConnectionOption
-    
+
     internal init(option: ConnectionOption, pool: ConnectionPool) {
         self.option = option
         self.pool = pool
         self.mysql_ = nil
     }
-    
+
     internal func release() {
         pool.releaseConnection(self)
     }
-    
+
     internal static func setReconnect(_ reconnect: Bool, mysql: UnsafeMutablePointer<MYSQL>) {
         let reconnectPtr = UnsafeMutablePointer<my_bool>.allocate(capacity: 1)
         reconnectPtr.pointee = reconnect == false ? 0 : 1
         mysql_options(mysql, MYSQL_OPT_RECONNECT, reconnectPtr)
         reconnectPtr.deallocate()
     }
-    
+
     func setReconnect(_ reconnect: Bool) {
         if let mysql = mysql {
             Connection.setReconnect(reconnect, mysql: mysql)
         }
     }
-    
+
     internal func connect() throws -> UnsafeMutablePointer<MYSQL> {
         dispose()
-        
+
         guard let mysql = mysql_init(nil) else {
             fatalError("mysql_init() failed.")
         }
-        
+
         do {
             let timeoutPtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
             timeoutPtr.pointee = option.timeout
             mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, timeoutPtr)
             timeoutPtr.deallocate()
         }
-        
+
+        do {
+            let sslPtr = UnsafeMutablePointer<Int>.allocate(capacity: 1)
+            sslPtr.pointee = option.ssl
+            mysql_options(mysql, MYSQL_OPT_SSL_MODE, sslPtr)
+            sslPtr.deallocate()
+        }
+
         Connection.setReconnect(option.reconnect, mysql: mysql)
-        
+
         if mysql_real_connect(mysql,
             option.host,
             option.user,
@@ -130,21 +144,21 @@ public final class Connection {
         self.mysql_ = mysql
         return mysql
     }
-    
+
     internal func connectIfNeeded() throws -> UnsafeMutablePointer<MYSQL> {
         guard let mysql = self.mysql_ else {
             return try connect()
         }
         return mysql
     }
-    
+
     private var mysql: UnsafeMutablePointer<MYSQL>? {
         guard mysql_ != nil else {
             return nil
         }
         return mysql_
     }
-    
+
     internal func ping() -> Bool {
         _ = try? connectIfNeeded()
         guard let mysql = mysql else {
@@ -152,7 +166,7 @@ public final class Connection {
         }
         return mysql_ping(mysql) == 0
     }
-    
+
     private func dispose() {
         guard let mysql = mysql else {
             return
@@ -160,10 +174,8 @@ public final class Connection {
         mysql_close(mysql)
         self.mysql_ = nil
     }
-    
+
     deinit {
         dispose()
     }
 }
-
-
